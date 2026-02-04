@@ -13,7 +13,6 @@ frontend/out/
 *.log
 
 # Sensitive Data
-backend/src/main/resources/application.properties
 .env
 .env.local
 
