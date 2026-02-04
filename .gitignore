@@ -1,0 +1,22 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build
+backend/target/
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# Logs
+*.log
+
+# Sensitive Data
+backend/src/main/resources/application.properties
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
