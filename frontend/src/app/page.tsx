@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { API_BASE_URL } from "@/lib/api";
+import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     AreaChart,
@@ -31,7 +30,7 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/dashboard/stats`);
+                const response = await api.get("/api/dashboard/stats");
                 setData(response.data);
             } catch (error) {
                 console.error("Failed to fetch dashboard stats", error);

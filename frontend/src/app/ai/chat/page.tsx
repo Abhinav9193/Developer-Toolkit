@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import axios from "axios";
-import { API_BASE_URL } from "@/lib/api";
+import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +35,7 @@ export default function ChatPage() {
         setLoading(true);
 
         try {
-            const { data } = await axios.post(`${API_BASE_URL}/api/ai/chat`, {
+            const { data } = await api.post("/api/ai/chat", {
                 messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
             });
 

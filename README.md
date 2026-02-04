@@ -1,111 +1,63 @@
 # Developer Toolkit
 
-A modern, full-stack developer utility suite built with Next.js 14, Spring Boot 3, and AI integration.
+A modern, full-stack developer utility suite built with Next.js 14, Spring Boot 3, and Google Gemini AI integration.
 
 ## Features
 
-- **Dashboard**: Usage statistics and charts.
+- **Dashboard**: Real-time ecosystem stats, web developer growth charts, and latest tech news.
 - **Utilities**:
-  - JSON Formatter (Format, Minify)
-  - Regex Tester (Live matching)
-  - Markdown Preview (Real-time)
-  - Base64 Converter
-  - API Tester (HTTP Requests)
-  - Snippet Manager (Save code snippets to database)
-- **AI Tools** (Powered by OpenAI GPT-4o-mini):
-  - Summarizer
-  - Resume Analyzer
-  - Chat Assistant
+  - **JSON Converter**: AI-powered tool to convert random unstructured text into clean JSON.
+  - **Regex Tester**: Live matching with index and group tracking.
+  - **Markdown Preview**: Real-time rendering with full styling.
+  - **Base64 Converter**: Encode and decode text with one-click copy.
+  - **API Tester**: Powerful HTTP request builder and response viewer.
+  - **Snippet Manager**: Save, copy, and manage code snippets with MySQL persistence.
+- **AI Tools** (Powered by Google Gemini 2.5 Flash):
+  - **AI Summarizer**: Condense long text into concise summaries.
+  - **Resume Analyzer**: Get AI scores and improvement suggestions for your career.
+  - **AI Chat Assistant**: A smart coding companion for your daily tasks.
 
 ## Tech Stack
 
 **Frontend**:
 - Next.js 14 (App Router)
-- TypeScript
-- TailwindCSS
-- Shadcn/UI components
-- Framer Motion
-- Axios
-- Recharts
+- TypeScript & TailwindCSS
+- Shadcn/UI & Framer Motion (Animations)
+- Axios & Recharts (Data Visualization)
 
 **Backend**:
-- Java 21
+- Java 17+
 - Spring Boot 3
-- Spring Data JPA
-- MySQL
-- WebClient (for OpenAI)
+- Spring Data JPA & MySQL
+- WebClient (Reactive API calls)
+- Google Gemini API
 
 ## Prerequisites
 
 - Node.js 18+
-- Java 21 (JDK)
-- Maven
+- Java 17+ (JDK)
 - MySQL Database
-- OpenAI API Key
+- Google Gemini API Key
 
 ## Getting Started
 
 ### 1. Database Setup
-
-Ensure MySQL is running. Create a database named `devtools`.
-
-```sql
-CREATE DATABASE devtools;
-```
+Create a database named `devtools` in your MySQL instance.
 
 ### 2. Backend Setup
-
-Navigate to `backend/`:
-
-1. Open `src/main/resources/application.yml` and check the database credentials (username: `root`, password: `password`). Update if needed.
-2. Set your OpenAI API Key environment variable:
-
-   **Windows (PowerShell)**:
-   ```powershell
-   $env:OPENAI_API_KEY="sk-..."
-   ```
-
-   **Linux/Mac**:
-   ```bash
-   export OPENAI_API_KEY="sk-..."
-   ```
-
+1. Navigate to `backend/`.
+2. Update `src/main/resources/application.properties` with your MySQL credentials and Gemini API Key.
 3. Run the application:
-
    ```bash
-   mvn spring-boot:run
+   ./mvnw spring-boot:run
    ```
-
-   The backend will start on `http://localhost:8080`.
+   The backend starts on `http://localhost:8080`.
 
 ### 3. Frontend Setup
+1. Navigate to `frontend/`.
+2. Install dependencies: `npm install`
+3. Run dev server: `npm run dev`
+4. Open `http://localhost:3000`.
 
-Navigate to `frontend/`:
-
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-2. Run the development server:
-
-   ```bash
-   npm run dev
-   ```
-
-3. Open `http://localhost:3000` in your browser.
-
-## Project Structure
-
-```
-developer-toolkit/
-├── backend/            # Spring Boot Application
-│   ├── src/main/java   # Java Source Code
-│   └── pom.xml         # Maven Config
-├── frontend/           # Next.js Application
-│   ├── src/app         # App Router Pages
-│   ├── src/components  # UI Components
-│   └── package.json    # Frontend Config
-└── README.md
-```
+## Deployment
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on deploying to Docker, Render, and Vercel.

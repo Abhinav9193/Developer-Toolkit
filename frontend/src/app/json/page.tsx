@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import axios from "axios";
-import { API_BASE_URL } from "@/lib/api";
+import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +19,7 @@ export default function JsonConverterPage() {
         setLoading(true);
         setError("");
         try {
-            const { data } = await axios.post(`${API_BASE_URL}/api/ai/convert-to-json`, { text: input });
+            const { data } = await api.post("/api/ai/convert-to-json", { text: input });
 
             // Try to parse it to ensure it's valid JSON for formatting
             try {

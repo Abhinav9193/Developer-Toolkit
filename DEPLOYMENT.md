@@ -23,13 +23,14 @@ Recommended platform: **Render**, **Railway**, or **AWS Elastic Beanstalk**.
 
 ### Steps for Render:
 1.  **Create a New Web Service**: Connect your GitHub repository.
-2.  **Runtime**: Select `Docker` (if using a Dockerfile) or `Java`.
+2.  **Runtime**: Select `Docker` (highly recommended) or `Java`.
+    *   If selecting `Docker`, Render will automatically use the `backend/Dockerfile`.
 3.  **Environment Variables**: Add these key variables in the dashboard:
     *   `SPRING_DATASOURCE_URL`: The JDBC URL from step 1.
     *   `SPRING_DATASOURCE_USERNAME`: Your DB user.
     *   `SPRING_DATASOURCE_PASSWORD`: Your DB password.
     *   `GEMINI_API_KEY`: Your Google Gemini API key.
-4.  **Build Command**: `./mvnw clean install -DskipTests` (inside the `backend` folder).
+4.  **Build Command**: `./mvnw clean package -DskipTests` (inside the `backend` folder).
 5.  **Start Command**: `java -jar target/*.jar`.
 
 ---

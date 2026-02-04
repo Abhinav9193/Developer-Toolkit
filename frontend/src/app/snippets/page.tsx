@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { API_BASE_URL } from "@/lib/api";
+import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,11 +17,13 @@ interface Snippet {
     code: string;
 }
 
-const API_URL = `${API_BASE_URL}/api/snippets`;
+const API_URL = "/api/snippets";
 
 export default function SnippetsPage() {
     const [snippets, setSnippets] = useState<Snippet[]>([]);
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({ title: "", language: "", code: "" });
     const [copiedId, setCopiedId] = useState<number | null>(null);
 
@@ -32,7 +33,7 @@ export default function SnippetsPage() {
 
     const fetchSnippets = async () => {
         try {
-            const { data } = await axios.get(API_URL);
+            const { data } = await api.get(API_URL);
             setSnippets(data);
         } catch (error) {
             console.error("Failed to fetch snippets", error);
@@ -43,18 +44,23 @@ export default function SnippetsPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmitting(true);
+        setError(null);
         try {
-            const { data } = await axios.post(API_URL, formData);
+            const { data } = await api.post(API_URL, formData);
             setSnippets([...snippets, data]);
             setFormData({ title: "", language: "", code: "" });
         } catch (error) {
             console.error("Failed to create snippet", error);
+            setError("Failed to save snippet. Please try again.");
+        } finally {
+            setSubmitting(false);
         }
     };
 
     const handleDelete = async (id: number) => {
         try {
-            await axios.delete(`${API_URL}/${id}`);
+            await api.delete(`${API_URL}/${id}`);
             setSnippets(snippets.filter((s) => s.id !== id));
         } catch (error) {
             console.error("Failed to delete snippet", error);
@@ -166,8 +172,11 @@ export default function SnippetsPage() {
                                     required
                                 />
                             </div>
-                            <Button type="submit" className="w-full" variant="gradient">
-                                Save Snippet
+                            {error && (
+                                <p className="text-red-500 text-xs text-center">{error}</p>
+                            )}
+                            <Button type="submit" className="w-full" variant="gradient" disabled={submitting}>
+                                {submitting ? "Saving..." : "Save Snippet"}
                             </Button>
                         </form>
                     </CardContent>

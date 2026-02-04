@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import axios from "axios";
-import { API_BASE_URL } from "@/lib/api";
+import api from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +18,7 @@ export default function ResumePage() {
         if (!text.trim()) return;
         setLoading(true);
         try {
-            const { data } = await axios.post(`${API_BASE_URL}/api/ai/resume`, { text });
+            const { data } = await api.post("/api/ai/resume", { text });
             setResult(data.result);
         } catch (error) {
             console.error(error);
