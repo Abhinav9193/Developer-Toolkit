@@ -81,59 +81,65 @@ export default function SnippetsPage() {
                     Saved Snippets
                 </h2>
                 {loading ? (
-                    <p>Loading...</p>
+                    <div className="flex justify-center items-center h-64">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                    </div>
                 ) : (
-                    <div className="grid gap-4">
-                        <AnimatePresence>
-                            {snippets.map((snippet) => (
-                                <motion.div
-                                    key={snippet.id}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    layout
-                                >
-                                    <Card className="group relative overflow-hidden">
-                                        <CardHeader className="pb-2">
-                                            <div className="flex justify-between items-center">
-                                                <CardTitle className="text-lg">{snippet.title}</CardTitle>
-                                                <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
-                                                    {snippet.language}
-                                                </span>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="relative">
-                                                <pre className="p-4 rounded-lg bg-black/50 overflow-x-auto text-sm font-mono text-gray-300 border border-white/5">
-                                                    {snippet.code}
-                                                </pre>
-                                                <div className="absolute top-2 right-2 flex gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 bg-black/40 hover:bg-white/10"
-                                                        onClick={() => handleCopy(snippet.code, snippet.id)}
-                                                    >
-                                                        {copiedId === snippet.id ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 bg-black/40 hover:bg-red-500/20 hover:text-red-400"
-                                                        onClick={() => handleDelete(snippet.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
+                    <div className="max-h-[calc(100vh-200px)] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="grid gap-4">
+                            <AnimatePresence>
+                                {snippets.map((snippet) => (
+                                    <motion.div
+                                        key={snippet.id}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        layout
+                                    >
+                                        <Card className="group relative overflow-hidden glass-card hover:border-primary/50 transition-colors">
+                                            <CardHeader className="pb-2">
+                                                <div className="flex justify-between items-center">
+                                                    <CardTitle className="text-lg font-semibold">{snippet.title}</CardTitle>
+                                                    <span className="text-[10px] uppercase font-bold tracking-wider bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full">
+                                                        {snippet.language}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-                        {snippets.length === 0 && (
-                            <p className="text-gray-500 text-center py-10">No snippets yet.</p>
-                        )}
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="relative group/code">
+                                                    <pre className="p-4 rounded-lg bg-black/40 overflow-x-auto text-sm font-mono text-gray-300 border border-white/5 scrollbar-hide">
+                                                        {snippet.code}
+                                                    </pre>
+                                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover/code:opacity-100 transition-opacity">
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="icon"
+                                                            className="h-8 w-8 bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/10"
+                                                            onClick={() => handleCopy(snippet.code, snippet.id)}
+                                                        >
+                                                            {copiedId === snippet.id ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                                                        </Button>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="icon"
+                                                            className="h-8 w-8 bg-black/60 hover:bg-red-500/20 hover:text-red-400 backdrop-blur-md border border-white/10"
+                                                            onClick={() => handleDelete(snippet.id)}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                            {snippets.length === 0 && (
+                                <div className="text-center py-20 bg-white/5 rounded-xl border border-dashed border-white/10">
+                                    <p className="text-gray-400">No snippets found. Create your first one!</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

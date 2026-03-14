@@ -1,0 +1,35 @@
+services:
+  # Backend Service
+  - type: web
+    name: dev-toolkit-backend
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: backend
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+    healthCheckPath: /api/dashboard/stats
+
+  # Frontend Service (Alternative to Vercel, though Vercel is specified)
+  - type: web
+    name: dev-toolkit-frontend
+    env: node
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false

@@ -35,39 +35,46 @@ public class GeminiService {
     }
 
     public Mono<String> summarize(String text) {
-        if (isKeyInvalid()) return Mono.just("AI service temporarily unavailable");
+        if (isKeyInvalid())
+            return Mono.just("AI service temporarily unavailable");
         String prompt = "Please summarize the following text:\n\n" + text;
         return callGemini(prompt);
     }
 
     public Mono<String> analyzeResume(String text) {
-        if (isKeyInvalid()) return Mono.just("AI service temporarily unavailable");
-        String prompt = "Please analyze this resume content. Provide a score out of 100, and 3-5 specific suggestions for improvement. Format as Markdown.\n\n" + text;
+        if (isKeyInvalid())
+            return Mono.just("AI service temporarily unavailable");
+        String prompt = "Please analyze this resume content. Provide a score out of 100, and 3-5 specific suggestions for improvement. Format as Markdown.\n\n"
+                + text;
         return callGemini(prompt);
     }
 
     public Mono<String> chat(List<ChatRequest.Message> messages) {
-        if (isKeyInvalid()) return Mono.just("AI service temporarily unavailable");
-        
+        if (isKeyInvalid())
+            return Mono.just("AI service temporarily unavailable");
+
         // Simple simplification for chat: merge all history into one prompt for Gemini
-        // Gemini has a specific chat structure but for this task we use the generation endpoint
+        // Gemini has a specific chat structure but for this task we use the generation
+        // endpoint
         StringBuilder prompt = new StringBuilder();
         for (ChatRequest.Message msg : messages) {
             prompt.append(msg.getRole().toUpperCase()).append(": ").append(msg.getContent()).append("\n");
         }
         prompt.append("ASSISTANT: ");
-        
+
         return callGemini(prompt.toString());
     }
 
     public Mono<String> convertToJson(String text) {
-        if (isKeyInvalid()) return Mono.just("AI service temporarily unavailable");
-        String prompt = "Convert the following random text into a well-structured JSON format. Only return the JSON object, nothing else.\n\nText: " + text;
+        if (isKeyInvalid())
+            return Mono.just("AI service temporarily unavailable");
+        String prompt = "Convert the following random text into a well-structured JSON format. Only return the JSON object, nothing else.\n\nText: "
+                + text;
         return callGemini(prompt);
     }
 
     private boolean isKeyInvalid() {
-        return apiKey == null || apiKey.trim().isEmpty() || apiKey.contains("${");
+        return apiKey == null || apiKey.trim().isEmpty();
     }
 
     private Mono<String> callGemini(String prompt) {
@@ -78,14 +85,15 @@ public class GeminiService {
         partsArray.addObject().put("text", prompt);
 
         return webClient.post()
-                .uri(apiUrl + apiKey)
+                .uri(apiUrl + "?key=" + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(root)
                 .retrieve()
                 .onStatus(status -> status.isError(),
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
-                                    System.err.println("Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
+                                    System.err.println(
+                                            "Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
                                     return Mono.error(new RuntimeException("Gemini API Error"));
                                 }))
                 .bodyToMono(JsonNode.class)

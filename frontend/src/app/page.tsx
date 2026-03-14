@@ -165,7 +165,7 @@ export default function Dashboard() {
                             Latest Ecosystem News
                         </h3>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                         {data?.articles.map((article, idx) => (
                             <motion.div
                                 key={idx}
@@ -173,7 +173,7 @@ export default function Dashboard() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.6 + idx * 0.1 }}
                             >
-                                <Card className="glass-card border-none hover:ring-1 hover:ring-white/10 transition-all cursor-pointer group group overflow-hidden">
+                                <Card className="glass-card border-none hover:ring-1 hover:ring-white/10 transition-all cursor-pointer group overflow-hidden">
                                     <div className="h-24 w-full relative overflow-hidden hidden sm:block">
                                         <img
                                             src={article.imageUrl}
