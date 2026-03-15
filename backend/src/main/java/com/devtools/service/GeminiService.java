@@ -84,9 +84,8 @@ public class GeminiService {
         ArrayNode partsArray = contentNode.putArray("parts");
         partsArray.addObject().put("text", prompt);
 
-        // HARDCODE the URL to bypass any malformed environment variables in Render
-        // that force an invalid 'v1' path or older models.
-        String finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
+        // Use the official, stable model name.
+        String finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
         return webClient.post()
                 .uri(finalUrl + "?key=" + apiKey)
