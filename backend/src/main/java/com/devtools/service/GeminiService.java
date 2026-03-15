@@ -84,35 +84,45 @@ public class GeminiService {
         ArrayNode partsArray = contentNode.putArray("parts");
         partsArray.addObject().put("text", prompt);
 
+        // Fallback to a safer model if URL is not set or using old gemini-pro
+        String finalUrl = apiUrl;
+        if (finalUrl == null || finalUrl.contains("gemini-pro")) {
+            finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        }
+
         return webClient.post()
-                .uri(apiUrl + "?key=" + apiKey)
+                .uri(finalUrl + "?key=" + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(root)
                 .retrieve()
                 .onStatus(status -> status.isError(),
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
-                                    System.err.println(
-                                            "Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
-                                    return Mono.error(new RuntimeException("Gemini API Error"));
+                                    System.err.println("Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
+                                    return Mono.error(new RuntimeException("Gemini API Error: " + errorBody));
                                 }))
                 .bodyToMono(JsonNode.class)
                 .map(jsonNode -> {
                     try {
-                        return jsonNode.path("candidates")
+                        JsonNode textNode = jsonNode.path("candidates")
                                 .get(0)
                                 .path("content")
                                 .path("parts")
                                 .get(0)
-                                .path("text")
-                                .asText();
+                                .path("text");
+                        
+                        if (textNode.isMissingNode()) {
+                            System.err.println("Unexpected Gemini response structure: " + jsonNode.toString());
+                            return "AI service temporarily unavailable (Response Structure Error)";
+                        }
+                        return textNode.asText();
                     } catch (Exception e) {
-                        System.err.println("Error parsing Gemini response: " + e.getMessage());
-                        return "AI service temporarily unavailable";
+                        System.err.println("Error parsing Gemini response: " + e.getMessage() + " | Raw: " + jsonNode.toString());
+                        return "AI service temporarily unavailable (Parsing Error)";
                     }
                 })
                 .onErrorResume(e -> {
-                    System.err.println("Error calling Gemini: " + e.getMessage());
+                    System.err.println("CRITICAL: Error calling Gemini: " + e.getMessage());
                     return Mono.just("AI service temporarily unavailable");
                 });
     }
