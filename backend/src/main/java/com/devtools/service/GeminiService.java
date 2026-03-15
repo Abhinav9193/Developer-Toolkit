@@ -86,8 +86,8 @@ public class GeminiService {
 
         // Fallback to a safer model if URL is not set or using old gemini-pro
         String finalUrl = apiUrl;
-        if (finalUrl == null || finalUrl.contains("gemini-pro")) {
-            finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        if (finalUrl == null || finalUrl.contains("gemini-pro") || finalUrl.contains("v1beta")) {
+            finalUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
         }
 
         return webClient.post()
