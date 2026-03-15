@@ -96,6 +96,20 @@ public class GeminiService {
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
                                     System.err.println("Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
+                                    
+                                    // If we get a 404, let's fetch the actual available models for this specific API key
+                                    if (clientResponse.statusCode().value() == 404) {
+                                        return webClient.get()
+                                            .uri("https://generativelanguage.googleapis.com/v1beta/models?key=" + apiKey)
+                                            .retrieve()
+                                            .bodyToMono(String.class)
+                                            .flatMap(modelsBody -> {
+                                                System.err.println("AVAILABLE MODELS FOR THIS KEY: " + modelsBody);
+                                                return Mono.error(new RuntimeException("Gemini API Error: " + errorBody + "\nAvailable Models: " + modelsBody.substring(0, Math.min(modelsBody.length(), 500))));
+                                            })
+                                            .onErrorResume(e -> Mono.error(new RuntimeException("Gemini API Error: " + errorBody)));
+                                    }
+
                                     return Mono.error(new RuntimeException("Gemini API Error: " + errorBody));
                                 }))
                 .bodyToMono(JsonNode.class)
