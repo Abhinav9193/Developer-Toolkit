@@ -16,34 +16,29 @@ The project is already configured to use Neon DB in production.
 ## 2. ⚙️ Backend: Render
 Render will host your Spring Boot API.
 
-1.  **Connect GitHub**: Go to [dashboard.render.com](https://dashboard.render.com), click **New > Web Service**, and connect your repository.
-2.  **Configuration**:
-    *   **Root Directory**: `backend`
-    *   **Runtime**: `Docker` (It will automatically find the `Dockerfile`).
-3.  **Environment Variables**:
-    *   `SPRING_PROFILES_ACTIVE`: `prod`
-    *   `PORT`: `8080`
-    *   `GEMINI_API_KEY`: `AIzaSy...` (Your Gemini Key)
-    *   `SPRING_DATASOURCE_URL`: (Your Neon Connection String)
-    *   `SPRING_DATASOURCE_USERNAME`: (Your Neon User)
-    *   `SPRING_DATASOURCE_PASSWORD`: (Your Neon Password)
-4.  **Wait for Build**: Render will build the Docker image and deploy. Note your Render URL (e.g., `https://your-app.onrender.com`).
+### 1. 🐘 Neon DB Setup (Current Project: dawn-forest)
+1. Go to your [Neon Console](https://console.neon.tech/app/projects/dawn-forest-07064942).
+2. Copy the **JDBC** connection string.
+3. It should start with `jdbc:postgresql://`.
 
-## 3. 🌐 Frontend: Vercel
-Vercel is the best home for your Next.js frontend.
+### ⚙️ Render Environment Variables (COPY THESE EXACTLY)
+| Key | Value |
+| :--- | :--- |
+| **SPRING_PROFILES_ACTIVE** | `prod` |
+| **PORT** | `8080` |
+| **SPRING_DATASOURCE_URL** | `jdbc:postgresql://ep-dawn-forest-07064942.us-east-1.aws.neon.tech/neondb?sslmode=require` |
+| **SPRING_DATASOURCE_USERNAME** | `neondb_owner` |
+| **SPRING_DATASOURCE_PASSWORD** | `npg_fhy6DMPKZYV7` |
+| **GEMINI_API_KEY** | (Your actual Gemini Key) |
 
-1.  **Connect GitHub**: Go to [vercel.com](https://vercel.com), click **Add New > Project**, and import your repository.
-2.  **Configuration**:
-    *   **Root Directory**: `frontend`
-    *   **Framework Preset**: `Next.js`
-3.  **Environment Variables**:
-    *   `NEXT_PUBLIC_API_URL`: `https://your-app.onrender.com` (Your Render Backend URL)
-4.  **Deploy**: Click **Deploy**. Vercel will have it live in ~1 minute.
+### 🚀 Vercel Fix
+1. Ensure `NEXT_PUBLIC_API_URL` is set to `https://dev-toolkit-backend.onrender.com`.
+2. Click **Redeploy** on the latest deployment.
 
----
-
-### ✅ Quick Fixes Made:
-*   Added `next.config.js` to allow external images (Picsum).
+### 🛠️ Why it was failing:
+1. **SCRAM Bug**: The previous driver (42.7.3) had a bug with Neon's authentication iterations. I updated the code to use **42.7.5** which fixes this.
+2. **Missing `jdbc:` prefix**: The connection URL must start with `jdbc:postgresql://`.
+3. **Hibernate Dialect**: I removed the explicit dialect to let Spring Boot 3 auto-detect the best one, avoiding a common startup crash.
 *   Verified CORS configuration in Backend to allow Frontend requests.
 *   Confirmed Multi-Environment properties (`local` vs `prod`).
 *   Verified that all entities/DTOs are Lombok-free for Java 21 compatibility.
