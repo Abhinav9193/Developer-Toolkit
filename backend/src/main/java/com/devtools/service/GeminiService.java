@@ -30,86 +30,92 @@ public class GeminiService {
         this.objectMapper = objectMapper;
     }
 
-    public String generateResponse(String prompt) {
-        return callGemini(prompt).block();
-    }
-
     public Mono<String> summarize(String text) {
         if (isKeyInvalid())
             return Mono.just("AI error: API Key is missing or empty.");
-        String prompt = "Please summarize the following text:\n\n" + text;
-        return callGemini(prompt);
+        String prompt = "Summarize the following text briefly and clearly:\n\n" + text;
+        return callGemini(prompt, false);
     }
 
     public Mono<String> analyzeResume(String text) {
         if (isKeyInvalid())
             return Mono.just("AI error: API Key is missing or empty.");
-        String prompt = "Please analyze this resume content. Provide a score out of 100, and 3-5 specific suggestions for improvement. Format as Markdown.\n\n"
+        String prompt = "You are a professional HR recruiter. Please analyze this resume content. Provide a score out of 100 based on modern industry standards, and exactly 5 specific, actionable suggestions for improvement. Format the entire response using Markdown.\n\n"
                 + text;
-        return callGemini(prompt);
+        return callGemini(prompt, false);
     }
 
     public Mono<String> chat(List<ChatRequest.Message> messages) {
         if (isKeyInvalid())
             return Mono.just("AI error: API Key is missing or empty.");
 
-        // Simple simplification for chat: merge all history into one prompt for Gemini
-        // Gemini has a specific chat structure but for this task we use the generation
-        // endpoint
-        StringBuilder prompt = new StringBuilder();
-        for (ChatRequest.Message msg : messages) {
-            prompt.append(msg.getRole().toUpperCase()).append(": ").append(msg.getContent()).append("\n");
-        }
-        prompt.append("ASSISTANT: ");
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode contentsArray = root.putArray("contents");
 
-        return callGemini(prompt.toString());
+        for (ChatRequest.Message msg : messages) {
+            ObjectNode contentNode = contentsArray.addObject();
+            // Gemini uses "user" and "model" roles. "assistant" should be mapped to "model".
+            String role = msg.getRole().equalsIgnoreCase("user") ? "user" : "model";
+            contentNode.put("role", role);
+            ArrayNode partsArray = contentNode.putArray("parts");
+            partsArray.addObject().put("text", msg.getContent());
+        }
+
+        return executeRequest(root);
     }
 
     public Mono<String> convertToJson(String text) {
         if (isKeyInvalid())
             return Mono.just("AI error: API Key is missing or empty.");
-        String prompt = "Convert the following random text into a well-structured JSON format. Only return the JSON object, nothing else.\n\nText: "
+        
+        String prompt = "Convert the following unstructured text into a well-structured JSON format. Extract all relevant entities and data points. Return ONLY the JSON object.\n\nText: "
                 + text;
-        return callGemini(prompt);
-    }
-
-    private boolean isKeyInvalid() {
-        return apiKey == null || apiKey.trim().isEmpty();
-    }
-
-    private Mono<String> callGemini(String prompt) {
+        
+        // Using response_mime_type since we now use gemini-1.5-flash by default in properties or code
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode contentsArray = root.putArray("contents");
         ObjectNode contentNode = contentsArray.addObject();
-        ArrayNode partsArray = contentNode.putArray("parts");
-        partsArray.addObject().put("text", prompt);
+        contentNode.putArray("parts").addObject().put("text", prompt);
 
-        // Use the official, stable model name.
-        String finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        ObjectNode generationConfig = root.putObject("generationConfig");
+        generationConfig.put("responseMimeType", "application/json");
+
+        return executeRequest(root);
+    }
+
+    private boolean isKeyInvalid() {
+        return apiKey == null || apiKey.trim().isEmpty() || apiKey.startsWith("${");
+    }
+
+    private Mono<String> callGemini(String prompt, boolean isJson) {
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode contentsArray = root.putArray("contents");
+        ObjectNode contentNode = contentsArray.addObject();
+        contentNode.putArray("parts").addObject().put("text", prompt);
+
+        if (isJson) {
+            ObjectNode generationConfig = root.putObject("generationConfig");
+            generationConfig.put("responseMimeType", "application/json");
+        }
+
+        return executeRequest(root);
+    }
+
+    private Mono<String> executeRequest(ObjectNode body) {
+        // Use configured URL or a safe fallback to 1.5-flash
+        String urlRoot = (apiUrl != null && !apiUrl.isEmpty() && !apiUrl.startsWith("${")) 
+                        ? apiUrl.split("\\?")[0] 
+                        : "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
         return webClient.post()
-                .uri(finalUrl + "?key=" + apiKey)
+                .uri(urlRoot + "?key=" + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(root)
+                .bodyValue(body)
                 .retrieve()
                 .onStatus(status -> status.isError(),
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
                                     System.err.println("Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
-                                    
-                                    // If we get a 404, let's fetch the actual available models for this specific API key
-                                    if (clientResponse.statusCode().value() == 404) {
-                                        return webClient.get()
-                                            .uri("https://generativelanguage.googleapis.com/v1beta/models?key=" + apiKey)
-                                            .retrieve()
-                                            .bodyToMono(String.class)
-                                            .flatMap(modelsBody -> {
-                                                System.err.println("AVAILABLE MODELS FOR THIS KEY: " + modelsBody);
-                                                return Mono.error(new RuntimeException("Gemini API Error: " + errorBody + "\nAvailable Models: " + modelsBody.substring(0, Math.min(modelsBody.length(), 500))));
-                                            })
-                                            .onErrorResume(e -> Mono.error(new RuntimeException("Gemini API Error: " + errorBody)));
-                                    }
-
                                     return Mono.error(new RuntimeException("Gemini API Error: " + errorBody));
                                 }))
                 .bodyToMono(JsonNode.class)
@@ -123,13 +129,17 @@ public class GeminiService {
                                 .path("text");
                         
                         if (textNode.isMissingNode()) {
-                            System.err.println("Unexpected Gemini response structure: " + jsonNode.toString());
-                            return "AI service temporarily unavailable (Response Structure Error)";
+                            // Check if blocked
+                            JsonNode finishReason = jsonNode.path("candidates").get(0).path("finishReason");
+                            if (!finishReason.isMissingNode()) {
+                                return "AI service blocked the response. Reason: " + finishReason.asText();
+                            }
+                            return "AI service returned an empty response. (Response Structure Error)";
                         }
                         return textNode.asText();
                     } catch (Exception e) {
-                        System.err.println("Error parsing Gemini response: " + e.getMessage() + " | Raw: " + jsonNode.toString());
-                        return "AI service temporarily unavailable (Parsing Error)";
+                        System.err.println("Error parsing Gemini response: " + e.getMessage());
+                        return "AI service: Error parsing response. Status: " + jsonNode.toString();
                     }
                 })
                 .onErrorResume(e -> {
@@ -138,3 +148,4 @@ public class GeminiService {
                 });
     }
 }
+
