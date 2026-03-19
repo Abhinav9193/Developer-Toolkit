@@ -102,13 +102,15 @@ public class GeminiService {
     }
 
     private Mono<String> executeRequest(ObjectNode body) {
-        // Safe fallback if apiUrl is not set properly
+        // Safe fallback if apiUrl is not set properly. Defaulting to v1 for flash stability.
         String urlRoot = (apiUrl != null && !apiUrl.isEmpty() && !apiUrl.contains("${")) 
                         ? apiUrl.split("\\?")[0] 
-                        : "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+                        : "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+
+        String finalUrl = urlRoot + "?key=" + apiKey;
 
         return webClient.post()
-                .uri(urlRoot + "?key=" + apiKey)
+                .uri(finalUrl)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .retrieve()
@@ -118,10 +120,12 @@ public class GeminiService {
                                     String userError = "Gemini API Error (" + clientResponse.statusCode() + ")";
                                     if (errorBody.contains("leaked") || errorBody.contains("reported")) {
                                         userError = "API Key error: The Gemini API key has been reported as leaked and is disabled. Please update it in Render/Vercel environment variables.";
+                                    } else if (clientResponse.statusCode().value() == 404) {
+                                        userError = "Gemini Model Not Found (404). Current URL: " + urlRoot + ". Please ensure the model exists for this API key.";
                                     } else if (clientResponse.statusCode().value() == 429) {
                                         userError = "API Limit Reached: Too many requests. Please wait a bit.";
                                     }
-                                    System.err.println(userError + " | Raw: " + errorBody);
+                                    System.err.println(userError + " | URL: " + urlRoot + " | Raw: " + errorBody);
                                     return Mono.error(new RuntimeException(userError));
                                 }))
                 .bodyToMono(JsonNode.class)
@@ -159,5 +163,6 @@ public class GeminiService {
                 });
     }
 }
+
 
 
