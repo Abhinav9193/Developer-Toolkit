@@ -102,12 +102,8 @@ public class GeminiService {
     }
 
     private Mono<String> executeRequest(ObjectNode body) {
-        // Safe fallback if apiUrl is not set properly. Defaulting to v1 for flash stability.
-        String urlRoot = (apiUrl != null && !apiUrl.isEmpty() && !apiUrl.contains("${")) 
-                        ? apiUrl.split("\\?")[0] 
-                        : "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
-
-        String finalUrl = urlRoot + "?key=" + apiKey;
+        // Use a perfectly formatted v1beta URL as it handles Flash models most reliably currently
+        String finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
         return webClient.post()
                 .uri(finalUrl)
@@ -119,50 +115,59 @@ public class GeminiService {
                                 .flatMap(errorBody -> {
                                     String userError = "Gemini API Error (" + clientResponse.statusCode() + ")";
                                     if (errorBody.contains("leaked") || errorBody.contains("reported")) {
-                                        userError = "API Key error: The Gemini API key has been reported as leaked and is disabled. Please update it in Render/Vercel environment variables.";
+                                        userError = "API Key error: Key is leaked. Please update GEMINI_API_KEY in Render.";
                                     } else if (clientResponse.statusCode().value() == 404) {
-                                        userError = "Gemini Model Not Found (404). Current URL: " + urlRoot + ". Please ensure the model exists for this API key.";
-                                    } else if (clientResponse.statusCode().value() == 429) {
-                                        userError = "API Limit Reached: Too many requests. Please wait a bit.";
+                                        // If flash fails, let's try a second request with gemini-pro (fallback logic)
+                                        return Mono.error(new RuntimeException("MODEL_NOT_FOUND"));
                                     }
-                                    System.err.println(userError + " | URL: " + urlRoot + " | Raw: " + errorBody);
-                                    return Mono.error(new RuntimeException(userError));
+                                    return Mono.error(new RuntimeException(userError + " | Raw: " + errorBody));
                                 }))
                 .bodyToMono(JsonNode.class)
-                .map(jsonNode -> {
-                    try {
-                        JsonNode candidates = jsonNode.path("candidates");
-                        if (candidates.isArray() && candidates.size() > 0) {
-                            JsonNode textNode = candidates.get(0)
-                                    .path("content")
-                                    .path("parts")
-                                    .get(0)
-                                    .path("text");
-                            
-                            if (!textNode.isMissingNode()) {
-                                return textNode.asText();
-                            }
-                        }
-
-                        // Check Finish Reason
-                        if (candidates.isArray() && candidates.size() > 0) {
-                            String reason = candidates.get(0).path("finishReason").asText();
-                            if ("SAFETY".equals(reason)) return "AI response blocked by safety filters.";
-                            if ("BLOCKED".equals(reason)) return "AI response blocked by content policy.";
-                        }
-
-                        return "AI service error: Empty or blocked response. (" + jsonNode.toString() + ")";
-                    } catch (Exception e) {
-                        return "AI response parsing error. Raw: " + jsonNode.toString();
-                    }
-                })
+                .map(this::parseGeminiResponse)
                 .onErrorResume(e -> {
-                    String msg = e.getMessage();
-                    if (msg == null) msg = "Connection error";
-                    return Mono.just("Service unreachable: " + msg);
+                    if ("MODEL_NOT_FOUND".equals(e.getMessage())) {
+                        // FALLBACK to gemini-pro if gemini-1.5-flash is not available for this key
+                        String fallbackUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
+                        return webClient.post()
+                                .uri(fallbackUrl)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(body)
+                                .retrieve()
+                                .bodyToMono(JsonNode.class)
+                                .map(this::parseGeminiResponse)
+                                .onErrorResume(e2 -> Mono.just("AI Service Error: Both Flash and Pro models failed. Please check your API key and region."));
+                    }
+                    return Mono.just("Service unreachable: " + e.getMessage());
                 });
     }
+
+    private String parseGeminiResponse(JsonNode jsonNode) {
+        try {
+            JsonNode candidates = jsonNode.path("candidates");
+            if (candidates.isArray() && candidates.size() > 0) {
+                JsonNode textNode = candidates.get(0)
+                        .path("content")
+                        .path("parts")
+                        .get(0)
+                        .path("text");
+                
+                if (!textNode.isMissingNode()) {
+                    return textNode.asText();
+                }
+            }
+
+            if (candidates.isArray() && candidates.size() > 0) {
+                String reason = candidates.get(0).path("finishReason").asText();
+                if ("SAFETY".equals(reason)) return "AI response blocked by safety filters.";
+            }
+
+            return "AI service error: Empty response. " + jsonNode.toString();
+        } catch (Exception e) {
+            return "AI parsing error. Raw: " + jsonNode.toString();
+        }
+    }
 }
+
 
 
 
