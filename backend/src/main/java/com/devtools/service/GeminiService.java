@@ -102,8 +102,8 @@ public class GeminiService {
     }
 
     private Mono<String> executeRequest(ObjectNode body) {
-        // Use configured URL or a safe fallback to 1.5-flash
-        String urlRoot = (apiUrl != null && !apiUrl.isEmpty() && !apiUrl.startsWith("${")) 
+        // Safe fallback if apiUrl is not set properly
+        String urlRoot = (apiUrl != null && !apiUrl.isEmpty() && !apiUrl.contains("${")) 
                         ? apiUrl.split("\\?")[0] 
                         : "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
@@ -115,37 +115,49 @@ public class GeminiService {
                 .onStatus(status -> status.isError(),
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
-                                    System.err.println("Gemini API Error (" + clientResponse.statusCode() + "): " + errorBody);
-                                    return Mono.error(new RuntimeException("Gemini API Error: " + errorBody));
+                                    String userError = "Gemini API Error (" + clientResponse.statusCode() + ")";
+                                    if (errorBody.contains("leaked") || errorBody.contains("reported")) {
+                                        userError = "API Key error: The Gemini API key has been reported as leaked and is disabled. Please update it in Render/Vercel environment variables.";
+                                    } else if (clientResponse.statusCode().value() == 429) {
+                                        userError = "API Limit Reached: Too many requests. Please wait a bit.";
+                                    }
+                                    System.err.println(userError + " | Raw: " + errorBody);
+                                    return Mono.error(new RuntimeException(userError));
                                 }))
                 .bodyToMono(JsonNode.class)
                 .map(jsonNode -> {
                     try {
-                        JsonNode textNode = jsonNode.path("candidates")
-                                .get(0)
-                                .path("content")
-                                .path("parts")
-                                .get(0)
-                                .path("text");
-                        
-                        if (textNode.isMissingNode()) {
-                            // Check if blocked
-                            JsonNode finishReason = jsonNode.path("candidates").get(0).path("finishReason");
-                            if (!finishReason.isMissingNode()) {
-                                return "AI service blocked the response. Reason: " + finishReason.asText();
+                        JsonNode candidates = jsonNode.path("candidates");
+                        if (candidates.isArray() && candidates.size() > 0) {
+                            JsonNode textNode = candidates.get(0)
+                                    .path("content")
+                                    .path("parts")
+                                    .get(0)
+                                    .path("text");
+                            
+                            if (!textNode.isMissingNode()) {
+                                return textNode.asText();
                             }
-                            return "AI service returned an empty response. (Response Structure Error)";
                         }
-                        return textNode.asText();
+
+                        // Check Finish Reason
+                        if (candidates.isArray() && candidates.size() > 0) {
+                            String reason = candidates.get(0).path("finishReason").asText();
+                            if ("SAFETY".equals(reason)) return "AI response blocked by safety filters.";
+                            if ("BLOCKED".equals(reason)) return "AI response blocked by content policy.";
+                        }
+
+                        return "AI service error: Empty or blocked response. (" + jsonNode.toString() + ")";
                     } catch (Exception e) {
-                        System.err.println("Error parsing Gemini response: " + e.getMessage());
-                        return "AI service: Error parsing response. Status: " + jsonNode.toString();
+                        return "AI response parsing error. Raw: " + jsonNode.toString();
                     }
                 })
                 .onErrorResume(e -> {
-                    System.err.println("CRITICAL: Error calling Gemini: " + e.getMessage());
-                    return Mono.just("API Error: " + e.getMessage());
+                    String msg = e.getMessage();
+                    if (msg == null) msg = "Connection error";
+                    return Mono.just("Service unreachable: " + msg);
                 });
     }
 }
+
 
