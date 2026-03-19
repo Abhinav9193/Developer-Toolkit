@@ -102,15 +102,26 @@ public class GeminiService {
     }
 
     private Mono<String> executeRequest(ObjectNode body) {
-        // Models to try in order of preference
-        List<String> models = List.of(
-            "gemini-1.5-flash", 
-            "gemini-1.5-flash-latest", 
-            "gemini-pro", 
-            "gemini-1.0-pro"
-        );
+        // Models to try in order of preference. We add the one from properties first if available.
+        List<String> preferredModels = new java.util.ArrayList<>();
         
-        return tryModelsSequentially(body, models, 0);
+        if (apiUrl != null && !apiUrl.isEmpty() && !apiUrl.contains("${")) {
+            // Extract model name from the full URL if possible
+            // expected: .../models/MODEL_NAME:generateContent
+            try {
+                String modelPart = apiUrl.split("/models/")[1].split(":")[0];
+                preferredModels.add(modelPart);
+            } catch (Exception e) {
+                // Ignore if parsing fails
+            }
+        }
+        
+        // Add standard fallbacks if not already there
+        for (String m : List.of("gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro", "gemini-1.0-pro")) {
+            if (!preferredModels.contains(m)) preferredModels.add(m);
+        }
+        
+        return tryModelsSequentially(body, preferredModels, 0);
     }
 
     private Mono<String> tryModelsSequentially(ObjectNode body, List<String> models, int index) {
