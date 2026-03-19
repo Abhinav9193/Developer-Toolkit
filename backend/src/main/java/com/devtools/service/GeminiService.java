@@ -102,8 +102,24 @@ public class GeminiService {
     }
 
     private Mono<String> executeRequest(ObjectNode body) {
-        // Use a perfectly formatted v1beta URL as it handles Flash models most reliably currently
-        String finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+        // Models to try in order of preference
+        List<String> models = List.of(
+            "gemini-1.5-flash", 
+            "gemini-1.5-flash-latest", 
+            "gemini-pro", 
+            "gemini-1.0-pro"
+        );
+        
+        return tryModelsSequentially(body, models, 0);
+    }
+
+    private Mono<String> tryModelsSequentially(ObjectNode body, List<String> models, int index) {
+        if (index >= models.size()) {
+            return Mono.just("AI Service Error: All available models failed (404). This usually means the API key is restricted or the region is unsupported. Please check Google AI Studio.");
+        }
+
+        String modelName = models.get(index);
+        String finalUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
 
         return webClient.post()
                 .uri(finalUrl)
@@ -113,31 +129,25 @@ public class GeminiService {
                 .onStatus(status -> status.isError(),
                         clientResponse -> clientResponse.bodyToMono(String.class)
                                 .flatMap(errorBody -> {
-                                    String userError = "Gemini API Error (" + clientResponse.statusCode() + ")";
-                                    if (errorBody.contains("leaked") || errorBody.contains("reported")) {
-                                        userError = "API Key error: Key is leaked. Please update GEMINI_API_KEY in Render.";
-                                    } else if (clientResponse.statusCode().value() == 404) {
-                                        // If flash fails, let's try a second request with gemini-pro (fallback logic)
+                                    if (clientResponse.statusCode().value() == 404) {
                                         return Mono.error(new RuntimeException("MODEL_NOT_FOUND"));
                                     }
-                                    return Mono.error(new RuntimeException(userError + " | Raw: " + errorBody));
+                                    if (errorBody.contains("leaked") || errorBody.contains("reported")) {
+                                        return Mono.error(new RuntimeException("API_KEY_LEAKED"));
+                                    }
+                                    return Mono.error(new RuntimeException("API_ERROR: " + clientResponse.statusCode() + " | " + errorBody));
                                 }))
                 .bodyToMono(JsonNode.class)
                 .map(this::parseGeminiResponse)
                 .onErrorResume(e -> {
                     if ("MODEL_NOT_FOUND".equals(e.getMessage())) {
-                        // FALLBACK to gemini-pro if gemini-1.5-flash is not available for this key
-                        String fallbackUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
-                        return webClient.post()
-                                .uri(fallbackUrl)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(body)
-                                .retrieve()
-                                .bodyToMono(JsonNode.class)
-                                .map(this::parseGeminiResponse)
-                                .onErrorResume(e2 -> Mono.just("AI Service Error: Both Flash and Pro models failed. Please check your API key and region."));
+                        System.err.println("Model " + modelName + " not found, trying next...");
+                        return tryModelsSequentially(body, models, index + 1);
                     }
-                    return Mono.just("Service unreachable: " + e.getMessage());
+                    if ("API_KEY_LEAKED".equals(e.getMessage())) {
+                        return Mono.just("API Key error: Your key is leaked and disabled. Please generate a new one in AI Studio.");
+                    }
+                    return Mono.just("AI Service Error: " + e.getMessage());
                 });
     }
 
@@ -145,7 +155,15 @@ public class GeminiService {
         try {
             JsonNode candidates = jsonNode.path("candidates");
             if (candidates.isArray() && candidates.size() > 0) {
-                JsonNode textNode = candidates.get(0)
+                JsonNode firstCandidate = candidates.get(0);
+                
+                // Check if blocked
+                if (!firstCandidate.path("finishReason").isMissingNode()) {
+                    String reason = firstCandidate.path("finishReason").asText();
+                    if ("SAFETY".equals(reason)) return "AI response blocked by safety filters.";
+                }
+
+                JsonNode textNode = firstCandidate
                         .path("content")
                         .path("parts")
                         .get(0)
@@ -155,18 +173,13 @@ public class GeminiService {
                     return textNode.asText();
                 }
             }
-
-            if (candidates.isArray() && candidates.size() > 0) {
-                String reason = candidates.get(0).path("finishReason").asText();
-                if ("SAFETY".equals(reason)) return "AI response blocked by safety filters.";
-            }
-
-            return "AI service error: Empty response. " + jsonNode.toString();
+            return "AI service error: No valid response parts. Raw: " + jsonNode.toString();
         } catch (Exception e) {
             return "AI parsing error. Raw: " + jsonNode.toString();
         }
     }
 }
+
 
 
 
