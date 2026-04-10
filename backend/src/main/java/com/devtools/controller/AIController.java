@@ -11,6 +11,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class AIController {
 
     @Autowired

@@ -9,6 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/snippets")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class SnippetController {
 
     @Autowired
